@@ -3,7 +3,7 @@ Code ideas from https://github.com/Newmu/dcgan and tensorflow mnist dataset read
 """
 import numpy as np
 import scipy.misc as misc
-
+import cv2 as cv
 
 class BatchDatset:
     files = []
@@ -26,6 +26,7 @@ class BatchDatset:
         """
         print("Initializing Batch Dataset Reader...")
         print(image_options)
+        print records_list
         self.files = records_list
         self.image_options = image_options
         self._read_images()
@@ -33,12 +34,23 @@ class BatchDatset:
     def _read_images(self):
         self.__channels = True
         self.images = np.array([self._transform(filename['image']) for filename in self.files])
-        self.__channels = False
-        self.annotations = np.array(
-            [np.expand_dims(self._transform(filename['annotation']), axis=3) for filename in self.files])
+        if self.image_options['test'] != True:
+            self.__channels = False
+            self.annotations = np.array(
+            #[np.expand_dims(self._transform(filename['annotation']), axis=3) for filename in self.files])
+                [self._transform(filename['annotation']) for filename in self.files])
+            self.annotations = self.annotations[:,:,:,0]
+            self.annotations = self.annotations/ 255
+            print ('max in annotation')
+            print (np.max(self.annotations))
+            print ('min in annotation')
+            print (np.min(self.annotations))
+            print 'annotations size'
+            print (self.annotations.shape)
+        print 'images size'
         print (self.images.shape)
-        print (self.annotations.shape)
 
+       
     def _transform(self, filename):
         image = misc.imread(filename)
         if self.__channels and len(image.shape) < 3:  # make sure images are of shape(h,w,3)
@@ -76,8 +88,14 @@ class BatchDatset:
             self.batch_offset = batch_size
 
         end = self.batch_offset
-        return self.images[start:end], self.annotations[start:end]
+        if self.image_options['test'] == True:
+            return self.images[start:end]
+        else:
+            return self.images[start:end], self.annotations[start:end]
 
     def get_random_batch(self, batch_size):
         indexes = np.random.randint(0, self.images.shape[0], size=[batch_size]).tolist()
-        return self.images[indexes], self.annotations[indexes]
+        if self.image_options['test'] == True:
+            return self.images[indexes]
+        else:
+            return self.images[indexes], self.annotations[indexes]

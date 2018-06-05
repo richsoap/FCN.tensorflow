@@ -6,6 +6,7 @@ import TensorflowUtils as utils
 import read_MITSceneParsingData as scene_parsing
 import datetime
 import BatchDatsetReader as dataset
+from crfrnn_layer import CrfRnnLayer
 from six.moves import xrange
 
 #os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  
@@ -24,7 +25,7 @@ MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydee
 
 MAX_ITERATION = int(1e5 + 1)
 NUM_OF_CLASSESS = 2
-IMAGE_SIZE = 500
+IMAGE_SIZE = 250
 
 def get_records(file_dir = './train/images/', max_number = 4000):
     out_records = []
@@ -139,9 +140,16 @@ def inference(image, keep_prob):
         b_t3 = utils.bias_variable([NUM_OF_CLASSESS], name="b_t3")
         conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
 
-        annotation_pred = tf.argmax(conv_t3, dimension=3, name="prediction")
+ 	output = CrfRnnLayer(image_dims=(IMAGE_SIZE, IMAGE_SIZE),
+                         num_classes=2,
+                         theta_alpha=160.,
+                         theta_beta=3.,
+                         theta_gamma=3.,
+                         num_iterations=10,
+name='crfrnn')([conv_t3, image])
+        annotation_pred = tf.argmax(output, dimension=3, name="prediction")
         
-    return tf.expand_dims(annotation_pred, dim=3), conv_t3
+    return tf.expand_dims(annotation_pred, dim=3), output
 
 
 def train(loss_val, var_list):

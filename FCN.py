@@ -13,7 +13,7 @@ from six.moves import xrange
 #os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "4", "batch size for training")
+tf.flags.DEFINE_integer("batch_size", "1", "batch size for training")
 tf.flags.DEFINE_string("logs_dir", "logs/", "path to logs directory")
 tf.flags.DEFINE_string("data_dir", "Data_zoo/MIT_SceneParsing/", "path to dataset")
 tf.flags.DEFINE_float("learning_rate", "1e-6", "Learning rate for Adam Optimizer")
@@ -25,9 +25,9 @@ MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydee
 
 MAX_ITERATION = int(1e5 + 1)
 NUM_OF_CLASSESS = 2
-IMAGE_SIZE = 250
+IMAGE_SIZE = 500
 
-def get_records(file_dir = './train/images/', max_number = 4000):
+def get_records(file_dir = './train/images/', max_number = 8000):
     out_records = []
     count = 0
     for root, dirs, files in os.walk(file_dir):
@@ -139,16 +139,21 @@ def inference(image, keep_prob):
         W_t3 = utils.weight_variable([16, 16, NUM_OF_CLASSESS, deconv_shape2[3].value], name="W_t3")
         b_t3 = utils.bias_variable([NUM_OF_CLASSESS], name="b_t3")
         conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
+        output = conv_t3
 
- 	output = CrfRnnLayer(image_dims=(IMAGE_SIZE, IMAGE_SIZE),
-                         num_classes=2,
+#################################################################################################
+	output = CrfRnnLayer(image_dims=(IMAGE_SIZE, IMAGE_SIZE),
+                       num_classes=2,
                          theta_alpha=160.,
                          theta_beta=3.,
                          theta_gamma=3.,
                          num_iterations=10,
-name='crfrnn')([conv_t3, image])
+        name='crfrnn')([conv_t3, image])
+##################################################################################################
         annotation_pred = tf.argmax(output, dimension=3, name="prediction")
+
         
+
     return tf.expand_dims(annotation_pred, dim=3), output
 
 
@@ -190,8 +195,8 @@ def main(argv=None):
         train_records = get_records()
         image_options = {'resize': False, 'test':False}
     else:
-        train_records = get_records('./test/images/', 40)
-        image_options = {'resize': False, 'test':True}
+        train_records = get_records('./test/images/', 300)
+        image_options = {'resize': True, 'test':True, 'resize_size': IMAGE_SIZE}
     print(len(train_records))
 
     print("Setting up dataset reader")
@@ -237,8 +242,9 @@ def main(argv=None):
                 """
                 saver.save(sess, FLAGS.logs_dir + "model.ckpt", itr)
     elif FLAGS.mode == "visualize":
-        for i in range(5):
-            valid_images = train_dataset_reader.get_random_batch(FLAGS.batch_size)
+        for i in range(100):
+            #valid_images = train_dataset_reader.get_random_batch(FLAGS.batch_size)
+            valid_images = train_dataset_reader.next_batch(FLAGS.batch_size)
             pred = sess.run(pred_annotation, feed_dict={image: valid_images,
                                                     keep_probability: 1.0})
             pred = np.squeeze(pred, axis=3)
